@@ -1,0 +1,25 @@
+{
+  "total": 20,
+  "graded": 20,
+  "errored": 0,
+  "ex_rate": 0.75,
+  "first_try_rate": 0.95,
+  "repaired_ok": 1,
+  "avg_attempts": 1.05,
+  "avg_tokens": 3474.9,
+  "avg_seconds": 53.17,
+  "by_difficulty": {
+    "medium": {
+      "total": 10,
+      "ok": 10,
+      "ex_rate": 1.0
+    },
+    "hard": {
+      "total": 10,
+      "ok": 5,
+      "ex_rate": 0.5
+    }
+  },
+  "finished_at": "2026-11-02T18:02:40",
+  "model": "qwen3.8-27b"
+}

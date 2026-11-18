@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InsightAgent · 数据分析助手</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #12161c;
+    --panel-2: #171c24;
+    --line: #232a35;
+    --text: #e7ecf3;
+    --muted: #8b97a8;
+    --accent: #5b8cff;
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --err: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 50% -200px, #16203a 0%, var(--bg) 60%);
+    color: var(--text);
+    font: 15px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .app { display: flex; flex-direction: column; height: 100vh; max-width: 980px; margin: 0 auto; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+  .brand .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+    box-shadow: 0 0 12px var(--ok);
+  }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  .meta { display: flex; align-items: center; gap: 8px; }
+  .badge {
+    font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+    padding: 3px 8px; border-radius: 999px; background: var(--panel);
+  }
+  .badge.subtle { opacity: .75; }
+  .ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+  }
+  .ghost:hover { color: var(--text); border-color: #33405a; }
+
+  .log { flex: 1; overflow-y: auto; padding: 24px 20px 8px; scroll-behavior: smooth; }
+
+  .empty { text-align: center; padding: 8vh 0; color: var(--muted); }
+  .empty h2 { color: var(--text); font-size: 20px; font-weight: 600; margin: 0 0 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+  }
+  .chip:hover { border-color: var(--accent); color: #cfe0ff; }
+
+  .msg { margin-bottom: 22px; }
+  .msg.user { display: flex; justify-content: flex-end; }
+  .bubble {
+    background: linear-gradient(180deg, #24408a, #1d3269);
+    border: 1px solid #2f4d9c; padding: 10px 14px; border-radius: 14px 14px 4px 14px;
+    max-width: 78%; white-space: pre-wrap;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; max-width: 100%;
+  }
+  .card .q { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .understood {
+    font-size: 12px; color: #9dd0ff; background: #0f2136; border: 1px solid #1b3a5c;
+    border-radius: 8px; padding: 6px 10px; margin-bottom: 10px;
+  }
+
+  .steps { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+  .step {
+    display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; color: var(--muted);
+    animation: pop .18s ease-out;
+  }
+  .step .pin { width: 7px; height: 7px; border-radius: 50%; background: #3a4557; flex: none; transform: translateY(-1px); }
+  .step.ok .pin { background: var(--ok); }
+  .step.warn .pin { background: var(--warn); }
+  .step.error .pin { background: var(--err); }
+  .step .label { color: var(--text); }
+  .step .detail { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @keyframes pop { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .result { border-top: 1px dashed var(--line); padding-top: 12px; }
+  .metric { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 10px; }
+  .metric .value { font-size: 30px; font-weight: 650; letter-spacing: .4px; color: #fff; }
+  .metric .label { color: var(--muted); font-size: 13px; }
+
+  .answer { white-space: pre-wrap; margin: 0 0 12px; }
+  .answer .k { color: var(--muted); }
+
+  .bars { display: grid; gap: 7px; margin: 6px 0 12px; }
+  .bar-row { display: grid; grid-template-columns: 88px 1fr 96px; align-items: center; gap: 10px; font-size: 12.5px; }
+  .bar-row .name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { background: #0e131a; border-radius: 6px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #3f6fe0, #5b8cff); border-radius: 6px; }
+  .bar-row .val { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 4px 0 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td { font-variant-numeric: tabular-nums; }
+
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 8px 0; background: #0f1319; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  details pre { margin: 10px 0 4px; white-space: pre-wrap; word-break: break-word; color: #cfe0ff; font-size: 12px; }
+  .attempts { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+  .attempts li { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); flex: none; }
+  .tag.ok { color: var(--ok); border-color: #1d4b3a; background: #0f241c; }
+  .tag.bad { color: var(--err); border-color: #4b1f1f; background: #251010; }
+  .tag.warn { color: var(--warn); border-color: #4b3a1a; background: #241d0f; }
+
+  .foot { color: var(--muted); font-size: 11.5px; margin-top: 8px; display: flex; gap: 14px; }
+  .errbox { color: #ffb4b4; background: #2a1414; border: 1px solid #4b1f1f; border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; }
+  .nodata {
+    color: #cfd8e6; background: #151b24; border: 1px dashed #33405a;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px;
+  }
+
+  .approval {
+    border: 1px solid #4b3a1a; background: #1d1810; border-radius: 12px;
+    padding: 12px 14px; margin: 10px 0;
+  }
+  .approval h4 { margin: 0 0 8px; font-size: 13.5px; color: var(--warn); font-weight: 600; }
+  .approval ul { margin: 0 0 10px; padding-left: 18px; color: #e8dcc4; font-size: 12.5px; }
+  .approval ul li { margin: 2px 0; }
+  .approval pre {
+    background: #0f1319; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; margin: 0 0 10px; white-space: pre-wrap; word-break: break-word;
+    color: #cfe0ff; font-size: 12px; max-height: 180px; overflow: auto;
+  }
+  .approval textarea {
+    width: 100%; min-height: 84px; background: #0f1319; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+    font: 12px/1.5 ui-monospace, Consolas, monospace; margin-bottom: 10px; resize: vertical;
+  }
+  .approval .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .approval button {
+    border-radius: 8px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text);
+  }
+  .approval button.primary { background: #2b6b4a; border-color: #35855c; color: #eafff4; }
+  .approval button.danger { background: #3a1f1f; border-color: #552a2a; color: #ffd5d5; }
+  .approval button:disabled { opacity: .5; cursor: default; }
+  .approval .hint { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+
+  .learned {
+    display: inline-block; font-size: 12px; color: #bff5d8; background: #12281d;
+    border: 1px solid #1f4b36; border-radius: 999px; padding: 3px 10px; margin-bottom: 10px;
+  }
+
+  .composer { display: flex; gap: 10px; padding: 12px 20px 18px; border-top: 1px solid var(--line); }
+  textarea {
+    flex: 1; resize: none; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    font: inherit; outline: none; max-height: 140px;
+  }
+  textarea:focus { border-color: #33405a; }
+  #send {
+    background: var(--accent); color: #fff; border: 0; border-radius: 12px;
+    padding: 0 20px; font-weight: 600; cursor: pointer;
+  }
+  #send:disabled { opacity: .45; cursor: default; }
+
+  .typing { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); font-size: 12px; }
+  .typing i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
+  .typing i:nth-child(2) { animation-delay: .15s; }
+  .typing i:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>InsightAgent</h1>
+      <span class="sub">生成 → 执行 → 校验 → 修复</span>
+    </div>
+    <div class="meta">
+      <span class="badge" id="model">连接中…</span>
+      <span class="badge subtle" id="thread"></span>
+      <button class="ghost" id="reset">清空会话</button>
+    </div>
+  </header>
+
+  <main class="log" id="log">
+    <section class="empty" id="empty">
+      <h2>问一个业务问题试试</h2>
+      <div class="chips">
+        <button class="chip">2024 年华东区销售额是多少？</button>
+        <button class="chip">2024 年各品类的销售额分别是多少？</button>
+        <button class="chip">2024 年哪个品类的销售额最高？</button>
+        <button class="chip">那华北呢？</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="composer">
+    <textarea id="input" rows="1" placeholder="例如：2024 年华东区销售额是多少？"></textarea>
+    <button id="send">发送</button>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const log = document.getElementById('log');
+  const empty = document.getElementById('empty');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  let threadId = localStorage.getItem('insight.thread');
+  if (!threadId) {
+    threadId = 'web-' + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('insight.thread', threadId);
+  }
+  document.getElementById('thread').textContent = threadId;
+
+  let busy = false;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+
+  const fmt = (v) => {
+    if (typeof v === 'number') {
+      return Number.isInteger(v) ? v.toLocaleString('zh-CN') : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return esc(v);
+  };
+
+  const scroll = () => { log.scrollTop = log.scrollHeight; };
+  const hideEmpty = () => { if (empty) empty.remove(); };
+
+  async function boot() {
+    try {
+      const r = await fetch('/api/health');
+      const h = await r.json();
+      document.getElementById('model').textContent = h.model + ' · ' + h.backend;
+    } catch { document.getElementById('model').textContent = '后端未连接'; }
+    await loadHistory();
+  }
+
+  async function loadHistory() {
+    try {
+      const r = await fetch('/api/threads/' + encodeURIComponent(threadId));
+      const data = await r.json();
+      if (data.history && data.history.length) {
+        hideEmpty();
+        for (const turn of data.history) {
+          addUser(turn.question);
+          addPastAnswer(turn);
+        }
+      }
+      // 上次没批完就关页面了：把审批卡片重新摆出来，接着批
+      if (data.pending && data.pending.type === 'approval') {
+        hideEmpty();
+        const wrap = addAssistant();
+        renderApproval(wrap, data.pending);
+      }
+      scroll();
+    } catch { /* 首次运行没有历史，忽略 */ }
+  }
+
+  function addUser(text) {
+    hideEmpty();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg user';
+    wrap.innerHTML = '<div class="bubble">' + esc(text) + '</div>';
+    log.appendChild(wrap);
+    scroll();
+  }
+
+  function addPastAnswer(turn) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg';
+    const card = document.createElement('div');
+    card.className = 'card';
+    const answer = (turn.answer || '').split('\n').slice(0, 6).join('\n');
+    card.innerHTML =
+      '<div class="q">历史 · ' + esc(turn.effective_question || turn.question) + '</div>' +
+      '<div class="answer">' + esc(answer) + '</div>' +
+      (turn.sql ? '<details><summary>当时的 SQL</summary><pre>' + esc(turn.sql) + '</pre></details>' : '');
+    wrap.appendChild(card);
+    log.appendChild(wrap);
+  }
+
+  function addAssistant() {
+    hideEmpty();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg';
+    wrap.innerHTML =
+      '<div class="card">' +
+        '<ul class="steps"></ul>' +
+        '<div class="typing"><i></i><i></i><i></i><span>执行中</span></div>' +
+        '<div class="result"></div>' +
+      '</div>';
+    log.appendChild(wrap);
+    scroll();
+    return wrap;
+  }
+
+  function addStep(list, ev) {
+    const li = document.createElement('li');
+    li.className = 'step ' + (ev.tone || 'info');
+    li.innerHTML =
+      '<span class="pin"></span>' +
+      '<span class="label">' + esc(ev.label) + '</span>' +
+      (ev.detail ? '<span class="detail">' + esc(ev.detail) + '</span>' : '');
+    list.appendChild(li);
+    scroll();
+  }
+
+  function renderFinal(wrap, ev) {
+    setTyping(wrap, false);
+    const box = wrap.querySelector('.result');
+
+    if (ev.learned_metric) {
+      box.insertAdjacentHTML('beforeend',
+        '<div class="learned">已记住：' + esc(ev.learned_metric) + ' = ' + esc(ev.learned_definition || '') + '</div>');
+    }
+
+    if (ev.raw_question && ev.question && ev.question !== ev.raw_question) {
+      const u = document.createElement('div');
+      u.className = 'understood';
+      u.textContent = '理解为：' + ev.question;
+      box.appendChild(u);
+    }
+
+    box.insertAdjacentHTML('beforeend', '<div class="answer">' + esc(ev.answer) + '</div>');
+
+    if (ev.verdict === 'no_data') {
+      const who = ev.missing_entity ? '：库里没有「' + esc(ev.missing_entity) + '」' : '';
+      box.insertAdjacentHTML('beforeend', '<div class="nodata">没有匹配的数据' + who + '</div>');
+    }
+
+    const chart = (ev.ok ? ev.chart : null) || {};
+    if (chart.type === 'metric' && chart.value !== undefined) {
+      box.insertAdjacentHTML('beforeend',
+        '<div class="metric"><span class="value">' + fmt(chart.value) + '</span>' +
+        '<span class="label">' + esc(chart.label || '') + '</span></div>');
+    }
+
+    const rows = ev.rows || [];
+    if (chart.type === 'bar' && rows.length > 1) {
+      const values = rows.map((r) => Number(r[1]) || 0);
+      const max = Math.max(...values, 1);
+      const bars = rows.map((r) => {
+        const value = Number(r[1]) || 0;
+        const width = Math.max(2, (value / max) * 100);
+        return '<div class="bar-row"><span class="name">' + esc(r[0]) + '</span>' +
+               '<span class="bar-track"><span class="bar-fill" style="width:' + width + '%"></span></span>' +
+               '<span class="val">' + fmt(value) + '</span></div>';
+      }).join('');
+      box.insertAdjacentHTML('beforeend', '<div class="bars">' + bars + '</div>');
+    } else if (chart.type === 'table' && (ev.columns || []).length) {
+      const head = ev.columns.map((c) => '<th>' + esc(c) + '</th>').join('');
+      const body = rows.slice(0, 20).map((r) =>
+        '<tr>' + r.map((c) => '<td>' + fmt(c) + '</td>').join('') + '</tr>').join('');
+      box.insertAdjacentHTML('beforeend', '<table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>');
+    }
+
+    if (ev.sql) {
+      box.insertAdjacentHTML('beforeend',
+        '<details><summary>查看 SQL</summary><pre>' + esc(ev.sql) + '</pre></details>');
+    }
+
+    const attempts = ev.attempts || [];
+    if (attempts.length) {
+      const items = attempts.map((a) => {
+        const cls = a.verdict === 'ok' ? 'ok' : (a.verdict === 'syntax_error' || a.verdict === 'runtime_error') ? 'bad' : 'warn';
+        const first = (a.sql || '').split('\n')[0].slice(0, 70);
+        return '<li><span class="tag ' + cls + '">#' + a.n + ' ' + esc(a.verdict) + '</span>' +
+               '<span>' + esc(first) + '…</span></li>';
+      }).join('');
+      box.insertAdjacentHTML('beforeend',
+        '<details><summary>执行记录 ' + attempts.length + ' 次</summary><ul class="attempts">' + items + '</ul></details>');
+    }
+
+    box.insertAdjacentHTML('beforeend',
+      '<div class="foot"><span>tokens ' + fmt(ev.tokens || 0) + '</span>' +
+      '<span>校验 ' + esc(ev.verdict || '-') + '</span>' +
+      '<span>历史 ' + fmt(ev.history || 0) + ' 轮</span></div>');
+
+    scroll();
+  }
+
+  function setTyping(wrap, on) {
+    const card = wrap.querySelector('.card');
+    const existing = wrap.querySelector('.typing');
+    if (!on) { if (existing) existing.remove(); return; }
+    if (existing) return;
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.innerHTML = '<i></i><i></i><i></i><span>执行中</span>';
+    card.insertBefore(el, card.querySelector('.result'));
+  }
+
+  function renderError(wrap, message) {
+    setTyping(wrap, false);
+    const box = wrap.querySelector('.result');
+    box.insertAdjacentHTML('beforeend', '<div class="errbox">' + esc(message) + '</div>');
+    scroll();
+  }
+
+  // 审批卡片：图停在这里等人点头，批准 / 拒绝 / 改完 SQL 再跑
+  function renderApproval(wrap, ev) {
+    setTyping(wrap, false);
+    const box = wrap.querySelector('.result');
+    const reasons = (ev.reasons || []).map((r) => '<li>' + esc(r) + '</li>').join('');
+    const card = document.createElement('div');
+    card.className = 'approval';
+    card.innerHTML =
+      '<h4>⚠ 这条查询需要你确认</h4>' +
+      '<ul>' + reasons + '</ul>' +
+      '<pre class="sqlview">' + esc(ev.sql || '') + '</pre>' +
+      '<textarea class="sql-edit" hidden></textarea>' +
+      '<div class="actions">' +
+        '<button class="primary" data-act="approve">批准执行</button>' +
+        '<button data-act="edit">改 SQL</button>' +
+        '<button class="danger" data-act="reject">拒绝</button>' +
+      '</div>' +
+      '<div class="hint">批准后才会真正查库；拒绝则什么都不执行。</div>';
+    box.appendChild(card);
+    scroll();
+
+    const editor = card.querySelector('.sql-edit');
+    const preview = card.querySelector('.sqlview');
+    let editing = false;
+
+    card.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const act = btn.dataset.act;
+        if (act === 'edit' && !editing) {
+          editing = true;
+          preview.hidden = true;
+          editor.hidden = false;
+          editor.value = ev.sql || '';
+          editor.focus();
+          btn.textContent = '用改后的 SQL 执行';
+          return;
+        }
+        card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+        if (act === 'edit') {
+          resume({ action: 'edit', sql: editor.value }, wrap);
+        } else if (act === 'reject') {
+          resume({ action: 'reject' }, wrap);
+        } else {
+          resume({ action: 'approve' }, wrap);
+        }
+      });
+    });
+  }
+
+  async function consume(res, wrap) {
+    const steps = wrap.querySelector('.steps');
+    if (!res.ok || !res.body) {
+      let detail = 'HTTP ' + res.status;
+      try { const body = await res.json(); if (body.detail) detail = body.detail; } catch { /* 非 JSON */ }
+      renderError(wrap, detail);
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let index;
+      while ((index = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        const line = frame.split('\n').find((l) => l.startsWith('data: '));
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === 'node') addStep(steps, ev);
+        else if (ev.type === 'approval') renderApproval(wrap, ev);
+        else if (ev.type === 'final') renderFinal(wrap, ev);
+        else if (ev.type === 'error') renderError(wrap, ev.message);
+      }
+    }
+  }
+
+  async function resume(decision, wrap) {
+    busy = true;
+    sendBtn.disabled = true;
+    setTyping(wrap, true);
+    try {
+      const res = await fetch('/api/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thread_id: threadId, ...decision }),
+      });
+      await consume(res, wrap);
+    } catch (err) {
+      renderError(wrap, String(err && err.message ? err.message : err));
+    } finally {
+      busy = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  async function ask(question) {
+    if (busy || !question.trim()) return;
+    busy = true;
+    sendBtn.disabled = true;
+    addUser(question);
+    const wrap = addAssistant();
+
+    try {
+      const res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, thread_id: threadId }),
+      });
+      await consume(res, wrap);
+    } catch (err) {
+      renderError(wrap, String(err && err.message ? err.message : err));
+    } finally {
+      busy = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', () => {
+    const q = input.value;
+    input.value = '';
+    input.style.height = 'auto';
+    ask(q);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const q = input.value;
+      input.value = '';
+      input.style.height = 'auto';
+      ask(q);
+    }
+  });
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  });
+
+  document.querySelectorAll('.chip').forEach((chip) => {
+    chip.addEventListener('click', () => ask(chip.textContent.trim()));
+  });
+
+  document.getElementById('reset').addEventListener('click', async () => {
+    if (!confirm('清空当前会话的历史？')) return;
+    await fetch('/api/threads/' + encodeURIComponent(threadId), { method: 'DELETE' });
+    log.innerHTML = '';
+    const section = document.createElement('section');
+    section.className = 'empty';
+    section.id = 'empty';
+    section.innerHTML = '<h2>已清空，重新开始</h2>';
+    log.appendChild(section);
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

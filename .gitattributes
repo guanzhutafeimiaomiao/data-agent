@@ -1,0 +1,11 @@
+* text=auto
+
+*.py    text
+*.md    text
+*.toml  text
+*.html  text
+*.jsonl text
+*.json  text
+
+*.png   binary
+*.pdf   binary
